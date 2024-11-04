@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { supabase } from "../../supabase";
 
@@ -10,17 +10,10 @@ export default function Profile() {
   const [fileUploadError, setFileUploadError] = useState(false);
   const [formData, setFormData] = useState({});
 
-  useEffect(() => {
-    if (file) {
-      handleFileUpload(file);
-    }
-  }, [file]);
-
-  const handleFileUpload = async (file) => {
+  const handleFileUpload = useCallback(async (file) => {
     const fileName = `${new Date().getTime()}_${file.name}`;
-    setFilePerc(0);  // Reset progress
+    setFilePerc(0); 
 
-    // Upload file to Supabase Storage
     const { data, error } = await supabase.storage
       .from("img")
       .upload(fileName, file, {
@@ -32,20 +25,22 @@ export default function Profile() {
       setFileUploadError(true);
       console.error("Upload error:", error.message);
     } else if (data) {
-      // Get the public URL
-      const { data: publicData, error: publicUrlError } = supabase.storage
+      const { data: publicUrlData } = supabase.storage
         .from("img")
         .getPublicUrl(fileName);
 
-      if (publicUrlError) {
-        setFileUploadError(true);
-        console.error("Error retrieving public URL:", publicUrlError.message);
-      } else {
-        setFormData({ ...formData, avatar: publicData.publicUrl });
-        setFilePerc(100);  // Set progress to 100% after successful upload
+      if (publicUrlData) {
+        setFormData((prevData) => ({ ...prevData, avatar: publicUrlData.publicUrl }));
+        setFilePerc(100); 
       }
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (file) {
+      handleFileUpload(file);
+    }
+  }, [file, handleFileUpload]);
 
   return (
     <div className="p-3 max-w-lg mx-auto">
@@ -62,13 +57,12 @@ export default function Profile() {
           onClick={() => fileRef.current.click()}
           src={formData.avatar || currentUser.avatar}
           alt="profile"
-          className="rounded-full h-24 w-24 object-cover
-          cursor-pointer self-center mt-2"
+          className="rounded-full h-24 w-24 object-cover cursor-pointer self-center mt-2"
         />
         <p className="text-sm self-center">
           {fileUploadError ? (
             <span className="text-red-700">
-              Error during image upload (image must be less than 2 MB)
+              Error Image Upload (image must be less than 2 MB)
             </span>
           ) : filePerc > 0 && filePerc < 100 ? (
             <span className="text-slate-700">{`Uploading ${filePerc}%`}</span>
